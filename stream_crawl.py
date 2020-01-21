@@ -14,13 +14,19 @@ import requests
 
 _LOGGER = logging.getLogger(__name__)
 logging.getLogger('chardet.charsetprober').setLevel(logging.INFO)
-logging.basicConfig(filename='output.log', filemode='a', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.basicConfig(filename='output.log', filemode='a', level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
 
 
 CONNECT_TIMEOUT = 30
 STREAM_TIMEOUT = 15
 FFMPEG_PATH = '/usr/bin/ffmpeg'
 FFPROBE_PATH = '/usr/bin/ffprobe'
+
+CSV_COLUMNS = ['Name', 'Group', 'Resolution', 'FPS',
+               'Bitrate', 'Audio Type', 'Audio Channels',
+               'Audio Bitrate', 'URL']
 
 CHANSTATS = {}
 
@@ -104,36 +110,31 @@ def capture_sample(url, length):
     return json_out
 
 
-def write_to_csv(filename):
-    """Write current CHANSTATS array to CSV"""
-    csv_columns = ['Name', 'Group', 'Resolution', 'FPS',
-                   'Bitrate', 'Audio Type', 'Audio Channels',
-                   'Audio Bitrate', 'URL']
-
-    with open(filename, mode='w') as channel_stats:
+def write_to_csv(filename, chan):
+    """Write current CHANSTATS to CSV"""
+    stats = CHANSTATS[chan]
+    with open(filename, mode='a') as channel_stats:
         chan_writer = csv.writer(channel_stats)
-        chan_writer.writerow(csv_columns)
-        for chan, stats in CHANSTATS.items():
-            try:
-                chan_writer.writerow([chan,
-                                      stats['group'],
-                                      stats['resolution'],
-                                      stats['fps'],
-                                      stats['bitrate'],
-                                      stats['atype'],
-                                      stats['achan'],
-                                      stats['abitrate'],
-                                      stats['path']])
-            except KeyError:
-                chan_writer.writerow([chan,
-                                      stats['group'],
-                                      "N/A",
-                                      "N/A",
-                                      "N/A",
-                                      "N/A",
-                                      "N/A",
-                                      "N/A",
-                                      stats['path']])
+        try:
+            chan_writer.writerow([chan,
+                                  stats['group'],
+                                  stats['resolution'],
+                                  stats['fps'],
+                                  stats['bitrate'],
+                                  stats['atype'],
+                                  stats['achan'],
+                                  stats['abitrate'],
+                                  stats['path']])
+        except KeyError:
+            chan_writer.writerow([chan,
+                                  stats['group'],
+                                  "N/A",
+                                  "N/A",
+                                  "N/A",
+                                  "N/A",
+                                  "N/A",
+                                  "N/A",
+                                  stats['path']])
 
 
 def populate_stream_dict(chan, data):
@@ -221,17 +222,22 @@ def main(argv):
         sys.exit()
 
     if sample_length > 0:
+        # Initialize CSV with column headers
+        if output_csv:
+            with open(output_csv, mode='w') as channel_stats:
+                chan_writer = csv.writer(channel_stats)
+                chan_writer.writerow(CSV_COLUMNS)
+
         for chan, stats in CHANSTATS.items():
             print('Initializing capture for ', chan)
             data = capture_sample(stats['path'], sample_length)
             upd = populate_stream_dict(chan, data)
+            write_to_csv(output_csv, chan)
+
             if upd == 0:
                 print('Stats captured for ', chan)
             else:
                 print('Error capturing stats for ', chan)
-
-        if output_csv:
-            write_to_csv(output_csv)
 
 
 if __name__ == '__main__':
