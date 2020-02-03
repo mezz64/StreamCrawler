@@ -10,6 +10,7 @@ import getopt
 import csv
 import uuid
 import requests
+import time
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -96,7 +97,11 @@ def capture_sample(url, length):
                 file_path]
 
         result = subprocess.check_output(cmd2)
-        json_out = json.loads(result)
+        try:
+            json_out = json.loads(result.decode('UTF-8'))
+        except TypeError:
+            _LOGGER.error("Unable to parse ffprobe output: " + result)
+            json_out = None
     else:
         _LOGGER.info("Stream unavailable for: " + url)
         json_out = None
@@ -104,8 +109,12 @@ def capture_sample(url, length):
     if os.path.isfile(file_path):
         try:
             os.remove(file_path)
-        except OSError as err:
-            _LOGGER.error("File removal error: " + err)
+        except (OSError, PermissionError):
+            time.sleep(1)
+            try:
+                os.remove(file_path)
+            except (OSError, PermissionError) as err:
+                _LOGGER.error("File removal error: " + str(err))
 
     return json_out
 
@@ -113,7 +122,7 @@ def capture_sample(url, length):
 def write_to_csv(filename, chan):
     """Write current CHANSTATS to CSV"""
     stats = CHANSTATS[chan]
-    with open(filename, mode='a') as channel_stats:
+    with open(filename, mode='a', newline='') as channel_stats:
         chan_writer = csv.writer(channel_stats)
         try:
             chan_writer.writerow([chan,
@@ -224,7 +233,7 @@ def main(argv):
     if sample_length > 0:
         # Initialize CSV with column headers
         if output_csv:
-            with open(output_csv, mode='w') as channel_stats:
+            with open(output_csv, mode='w', newline='') as channel_stats:
                 chan_writer = csv.writer(channel_stats)
                 chan_writer.writerow(CSV_COLUMNS)
 
