@@ -22,7 +22,7 @@ Filter, evaluate each stream in playlist that matches specified group for 60 sec
 
 
 ### Flags
-* `-i` - Define path to input playlist (only works for web links at the moment)
+* `-i` - Define path to input playlist (works for web links or local file paths)
 * `-o` - Define output csv file path (ex. output.csv)
 * `-t` - Duration to evaluate each stream in the playlist in seconds (ex. 60)
 * `-g` - Parse unique groups in supplied playlist and output to the terminal.  This command does not analyze any streams.

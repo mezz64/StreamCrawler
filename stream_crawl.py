@@ -9,8 +9,8 @@ import sys
 import getopt
 import csv
 import uuid
-import requests
 import time
+import requests
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,8 +22,14 @@ logging.basicConfig(filename='output.log', filemode='a', level=logging.DEBUG,
 
 CONNECT_TIMEOUT = 30
 STREAM_TIMEOUT = 15
-FFMPEG_PATH = '/usr/bin/ffmpeg'
-FFPROBE_PATH = '/usr/bin/ffprobe'
+
+# Define default paths
+if os.name == 'nt':
+    FFMPEG_PATH = 'ffmpeg.exe'
+    FFPROBE_PATH = 'ffprobe.exe'
+else:
+    FFMPEG_PATH = '/usr/bin/ffmpeg'
+    FFPROBE_PATH = '/usr/bin/ffprobe'
 
 CSV_COLUMNS = ['Name', 'Group', 'Resolution', 'FPS',
                'Bitrate', 'Audio Type', 'Audio Channels',
@@ -32,23 +38,35 @@ CSV_COLUMNS = ['Name', 'Group', 'Resolution', 'FPS',
 CHANSTATS = {}
 
 
-def parse_playlist(url, gfilter):
+def parse_playlist(path, gfilter):
     """Parse playlist url"""
-    _LOGGER.info('Fetching playlist from: %s', url)
-    try:
-        response = requests.get(url, timeout=CONNECT_TIMEOUT)
-    except (requests.exceptions.RequestException,
-            requests.exceptions.ConnectionError) as err:
-        _LOGGER.error('Unable to fetch playlist, error: %s', err)
-        return
+    _LOGGER.info('Fetching playlist from: %s', path)
 
-    if response.status_code != requests.codes.ok:
-        # If we didn't receive 200, abort
-        _LOGGER.debug('Unable to fetch playlist, error: %s', response.status_code)
-        return
+    # Determine if we have a local or http path
+    if path.startswith("http"):
+        try:
+            response = requests.get(path, timeout=CONNECT_TIMEOUT)
+        except (requests.exceptions.RequestException,
+                requests.exceptions.ConnectionError) as err:
+            _LOGGER.error('Unable to fetch playlist, error: %s', err)
+            return
 
-    response.content.decode('ISO-8859-1')
-    playlist = response.text
+        if response.status_code != requests.codes.ok:
+            # If we didn't receive 200, abort
+            _LOGGER.debug('Unable to fetch playlist, error: %s', response.status_code)
+            return
+
+        response.content.decode('ISO-8859-1')
+        playlist = response.text
+    else:
+        # Must be local file
+        try:
+            with open(path) as file:
+                playlist = file.read()
+        except OSError as err:
+            _LOGGER.debug('Unable to fetch playlist, error: %s', str(err))
+            return
+
     streams = playlist.split('#EXTINF')
 
     for strm in streams:
